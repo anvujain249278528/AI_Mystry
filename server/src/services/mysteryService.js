@@ -1,11 +1,7 @@
 import { generateText } from './gemini.js';
 import { AppError } from '../utils/errors.js';
 
-const difficultyRules = {
-  easy: { suspects: 3, minClues: 4, maxClues: 5, label: 'Easy' },
-  medium: { suspects: 4, minClues: 6, maxClues: 8, label: 'Medium' },
-  hard: { suspects: 5, minClues: 9, maxClues: 12, label: 'Hard' },
-};
+import { difficultyRules } from '../config/gameRules.js';
 
 // Options for "Create your own mystery". Keep in sync with client/src/pages/CreateMystery.jsx.
 export const customCaseOptions = {
@@ -123,36 +119,48 @@ function isUnique(items, key) {
   return new Set(values).size === values.length;
 }
 
-export function validateMystery(mystery, requestedDifficulty) {
+// Returns a short reason when the AI output breaks a rule, or null when it is valid.
+function findMysteryProblem(mystery, requestedDifficulty) {
   const rules = difficultyRules[requestedDifficulty];
-  if (!rules || !mystery || !hasRequiredText(mystery, requiredStrings.mystery)) return false;
-  if (mystery.difficulty !== requestedDifficulty) return false;
-  if (!Array.isArray(mystery.investigationQuestions) || mystery.investigationQuestions.length < 3 || mystery.investigationQuestions.some((question) => typeof question !== 'string' || !question.trim())) return false;
-  if (mystery.suspects?.length !== rules.suspects || !mystery.clues?.length || mystery.clues.length < rules.minClues || mystery.clues.length > rules.maxClues) return false;
-  if (!isUnique(mystery.suspects, 'id') || !isUnique(mystery.suspects, 'name') || !isUnique(mystery.clues, 'id')) return false;
-  if (mystery.suspects.some((suspect) => !hasRequiredText(suspect, requiredStrings.suspect) || !Number.isInteger(suspect.age) || suspect.age < 18 || suspect.age > 100)) return false;
-  if (mystery.clues.some((clue) => !hasRequiredText(clue, requiredStrings.clue) || !['initial', 'hidden'].includes(clue.discoveryCondition))) return false;
-  if (mystery.clues.filter((clue) => clue.discoveryCondition === 'initial').length < 2) return false;
-  if (!hasRequiredText(mystery.solution, requiredStrings.solution)) return false;
+  if (!rules || !mystery || !hasRequiredText(mystery, requiredStrings.mystery)) return "missing case text";
+  if (mystery.difficulty !== requestedDifficulty) return "wrong difficulty";
+  if (!Array.isArray(mystery.investigationQuestions) || mystery.investigationQuestions.length < 3 || mystery.investigationQuestions.some((question) => typeof question !== 'string' || !question.trim())) return "fewer than 3 investigation questions";
+  if (mystery.suspects?.length !== rules.suspects || mystery.clues?.length !== rules.clues) return `expected ${rules.suspects} suspects and ${rules.clues} clues, got ${mystery.suspects?.length} and ${mystery.clues?.length}`;
+  if (!isUnique(mystery.suspects, 'id') || !isUnique(mystery.suspects, 'name') || !isUnique(mystery.clues, 'id')) return "duplicate ids or names";
+  if (mystery.suspects.some((suspect) => !hasRequiredText(suspect, requiredStrings.suspect) || !Number.isInteger(suspect.age) || suspect.age < 18 || suspect.age > 100)) return "incomplete suspect";
+  if (mystery.clues.some((clue) => !hasRequiredText(clue, requiredStrings.clue) || !['initial', 'hidden'].includes(clue.discoveryCondition))) return "incomplete clue";
+  const initialClueCount = mystery.clues.filter((clue) => clue.discoveryCondition === 'initial').length;
+  if (initialClueCount < 2 || initialClueCount === mystery.clues.length) return "needs 2+ starting clues and 1+ hidden clue";
+  if (!hasRequiredText(mystery.solution, requiredStrings.solution)) return "incomplete solution";
 
   const suspectIds = new Set(mystery.suspects.map((suspect) => suspect.id));
   const clueIds = new Set(mystery.clues.map((clue) => clue.id));
-  if (!suspectIds.has(mystery.solution.culpritId)) return false;
-  if (mystery.clues.some((clue) => clue.relatedSuspectIds.some((id) => !suspectIds.has(id)))) return false;
-  if (!Array.isArray(mystery.solution.decisiveClueIds) || !mystery.solution.decisiveClueIds.length) return false;
-  if (mystery.solution.decisiveClueIds.some((id) => !clueIds.has(id))) return false;
+  if (!suspectIds.has(mystery.solution.culpritId)) return "culprit is not a suspect";
+  if (mystery.clues.some((clue) => clue.relatedSuspectIds.some((id) => !suspectIds.has(id)))) return "clue points to unknown suspect";
+  if (!Array.isArray(mystery.solution.decisiveClueIds) || !mystery.solution.decisiveClueIds.length) return "no decisive clues";
+  if (mystery.solution.decisiveClueIds.some((id) => !clueIds.has(id))) return "decisive clue does not exist";
   const decisiveClues = mystery.clues.filter((clue) => mystery.solution.decisiveClueIds.includes(clue.id));
-  if (!decisiveClues.some((clue) => clue.relatedSuspectIds.includes(mystery.solution.culpritId))) return false;
+  if (!decisiveClues.some((clue) => clue.relatedSuspectIds.includes(mystery.solution.culpritId))) return "no decisive clue links to the culprit";
 
-  // Names may appear in the suspect list, but must not be used to spoil the culprit in player-facing prose.
-  const culpritName = mystery.suspects.find((suspect) => suspect.id === mystery.solution.culpritId)?.name;
-  const publicProse = [mystery.title, mystery.category, mystery.scenario, mystery.briefing, mystery.victimDetails,
-    ...(mystery.investigationQuestions || []),
+  // Clues and profiles may mention the culprit by name (real evidence does), but the case must not give the answer away.
+  const culprit = mystery.suspects.find((suspect) => suspect.id === mystery.solution.culpritId);
+  const names = [culprit?.name, culprit?.name?.split(/\s+/).at(-1)].filter((value) => value && value.length > 2).map(escapeRegExp);
+  const nameRe = names.length ? `(?:${names.join("|")})` : null;
+  // 1. The title and the suggested questions must not name the culprit.
+  const headline = [mystery.title, mystery.category, ...mystery.investigationQuestions].join(" ");
+  if (nameRe && new RegExp(`\\b${nameRe}\\b`, "i").test(headline)) return "culprit named in title or questions";
+  // 2. No player-facing text may state who is guilty.
+  const publicProse = [mystery.scenario, mystery.briefing, mystery.victimDetails,
     ...mystery.suspects.flatMap(({ name: _name, privateKnowledge: _privateKnowledge, ...suspect }) => Object.values(suspect)),
-    ...mystery.clues.flatMap(({ id: _id, relatedSuspectIds: _related, ...clue }) => Object.values(clue))]
-    .filter((value) => typeof value === 'string').join(' ');
-  if (culpritName && new RegExp(`\\b${escapeRegExp(culpritName)}\\b`, 'i').test(publicProse)) return false;
-  return true;
+    ...mystery.clues.flatMap(({ id: _id, relatedSuspectIds: _related, relevance: _relevance, ...clue }) => Object.values(clue))]
+    .filter((value) => typeof value === "string").join(" ");
+  const guilt = "(?:the )?(?:culprit|thief|murderer|killer|forger|saboteur|blackmailer|person responsible)";
+  if (nameRe && new RegExp(`\\b${nameRe}\\b,? (?:is|was) ${guilt}|${guilt} (?:is|was) ${nameRe}\\b`, "i").test(publicProse)) return "player-facing text reveals the culprit";
+  return null;
+}
+
+export function validateMystery(mystery, requestedDifficulty) {
+  return !findMysteryProblem(mystery, requestedDifficulty);
 }
 
 function escapeRegExp(value) {
@@ -163,7 +171,7 @@ function generationPrompt(difficulty, rules, attempt, idea) {
   return `Create a brand-new, fair-play detective mystery for an interactive investigation game. This is generation attempt ${attempt}; make the evidence and final explanation especially clear and internally consistent.
 
 Difficulty: ${rules.label}
-Exactly ${rules.suspects} suspects. Between ${rules.minClues} and ${rules.maxClues} clues. Use exactly one culprit.
+Exactly ${rules.suspects} suspects. Exactly ${rules.clues} clues. Use exactly one culprit.
 
 Requirements:
 - Make an original, grounded case that can be solved by comparing evidence, motives, alibis, and a coherent timeline.
@@ -173,7 +181,7 @@ Requirements:
 - The solution must state the culpritId, motive, method, actual timeline, a complete logical explanation, and decisiveClueIds.
 - Use unique IDs such as S01 and C01. All IDs must be stable.
 - Avoid gore and explicit violence. Use varied categories such as theft, forgery, disappearance, sabotage, or a non-graphic murder investigation.
-- Do not include the culprit's name in any player-facing prose (scenario, briefing, suspect descriptions, clue text, or titles). The name belongs only in the suspect list and protected solution references.
+- Player-facing text (scenario, briefing, suspect profiles, clues) may mention any suspect by name, including the culprit, but must never state or strongly imply who is guilty. Never put the culprit's name in the title or investigationQuestions.
 - Do not include clues that are irrelevant without explanation. Include plausible red herrings that can be resolved fairly.
 - Do not add fields beyond the requested schema. Return only JSON.
 
@@ -191,7 +199,7 @@ export async function generateMystery(difficulty, idea = null) {
   const rules = difficultyRules[difficulty];
   if (!rules) throw new AppError(400, 'Choose Easy, Medium, or Hard to begin.', 'INVALID_DIFFICULTY');
   let lastError;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const raw = await generateText(generationPrompt(difficulty, rules, attempt, idea), { schema: mysterySchema, temperature: 0.9 });
       const mystery = JSON.parse(raw);
@@ -201,8 +209,10 @@ export async function generateMystery(difficulty, idea = null) {
         if (idea.category !== 'surprise') mystery.category = categoryLabels[idea.category];
         mystery.origin = 'custom';
       }
-      if (validateMystery(mystery, difficulty)) return mystery;
-      lastError = new Error('Mystery failed structural validation.');
+      const problem = findMysteryProblem(mystery, difficulty);
+      if (!problem) return mystery;
+      console.warn(`Generated ${difficulty} mystery rejected (attempt ${attempt}): ${problem}`);
+      lastError = new Error(`Mystery failed validation: ${problem}`);
     } catch (error) {
       if (error instanceof AppError) throw error;
       lastError = error;

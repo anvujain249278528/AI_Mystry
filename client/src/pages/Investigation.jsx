@@ -33,7 +33,7 @@ function Overview({ game, changeTab }) {
     <div className="overview-stats">
       <div><span>PERSONS OF INTEREST</span><strong>{mystery.suspects.length.toString().padStart(2, '0')}</strong><small>suspects on file</small></div>
       <div><span>CLUES FOUND</span><strong>{game.discoveredClueIds.length.toString().padStart(2, '0')}<i> / {mystery.clues.length + mystery.hiddenLeads.length}</i></strong><small>pieces of evidence</small></div>
-      <div><span>HINTS REQUESTED</span><strong>{game.hintsUsed.length.toString().padStart(2, '0')}<i> / 03</i></strong><small>available in sequence</small></div>
+      <div><span>HINTS REQUESTED</span><strong>{game.hintsUsed.length.toString().padStart(2, "0")}<i> / {String(game.rules.maxHints).padStart(2, "0")}</i></strong><small>available in sequence</small></div>
     </div>
     <section className="progress-card"><div className="progress-header"><div><span>FIELD NOTES</span><h3>Investigation in progress</h3></div><b>{progress}%</b></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div><p>Examine the evidence and compare what each suspect tells you.</p></section>
     <div className="overview-columns">
@@ -113,14 +113,16 @@ function Interrogation({ game, suspectId, setSuspectId, onSend, busy }) {
 }
 
 function Hints({ game, onHint, busy }) {
-  const hintLevels = [
+  const allLevels = [
     { level: 1, name: 'A gentle nudge', detail: 'A broad direction to help you think.' },
     { level: 2, name: 'Investigative direction', detail: 'A closer look at a clue or contradiction.' },
     { level: 3, name: 'The stronger lead', detail: 'A direct connection between evidence and opportunity.' },
   ];
+  // Easy cases get 2 hints: the gentle nudge, then the stronger lead.
+  const hintLevels = game.rules.maxHints === 2 ? [allLevels[0], { ...allLevels[2], level: 2 }] : allLevels.slice(0, game.rules.maxHints);
   const nextLevel = game.hintsUsed.length + 1;
   return <div className="workspace-content">
-    <div className="view-heading"><div><Eyebrow icon={Lightbulb}>Progressive hints</Eyebrow><h2>A nudge, when you need one.</h2><p>Hints arrive in order and can each be used once. Every hint lowers a correct-case score by 10 points.</p></div><span className="view-count">{game.hintsUsed.length} / 03 USED</span></div>
+    <div className="view-heading"><div><Eyebrow icon={Lightbulb}>Progressive hints</Eyebrow><h2>A nudge, when you need one.</h2><p>Hints arrive in order and can each be used once. Every hint costs 10 points.</p></div><span className="view-count">{game.hintsUsed.length} / {String(game.rules.maxHints).padStart(2, "0")} USED</span></div>
     <div className="hint-note"><Lightbulb size={17} /><p>Each hint is based on this case's fixed evidence and solution. It will point you toward what to compare without naming a suspect.</p></div>
     <div className="hint-levels">{hintLevels.map((hint) => {
       const used = game.hintsUsed.find((item) => item.level === hint.level);
@@ -131,7 +133,7 @@ function Hints({ game, onHint, busy }) {
         {used ? <div className="hint-content">“{used.content}”</div> : current ? <button className="button button-dark" disabled={busy} onClick={() => onHint(hint.level)}>{busy ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />} Request hint <ArrowRight size={14} /></button> : <div className="hint-locked"><LockKeyhole size={12} /> Request the previous hint first</div>}
       </article>;
     })}</div>
-    <div className="hint-score-note"><span>SCORING NOTE</span><p>Correct accusation: 100 points minus 10 for each hint. An incorrect accusation scores 0.</p></div>
+    <div className="hint-score-note"><span>SCORING NOTE</span><p>Correct accusation: {game.rules.correctPoints} points. Each clue you find by searching: +{game.rules.pointsPerDiscoveredClue}. Each hint: {game.rules.pointsPerHint}. The score never goes below 0.</p></div>
   </div>;
 }
 

@@ -852,3 +852,9 @@ a { color: inherit; text-decoration: none; }
   .create-toolbar { flex-wrap: wrap; gap: 10px; }
   .back-row > span { display: none; }
 }
+
+/* Score breakdown on the result page */
+.score-breakdown { margin: 10px 0 0; display: grid; gap: 5px; }
+.score-breakdown div { display: flex; justify-content: space-between; gap: 10px; padding-top: 5px; border-top: 1px solid var(--line); color: #a3a3aa; font-size: 10px; }
+.score-breakdown dt { margin: 0; }
+.score-breakdown dd { margin: 0; color: var(--gold-light); font-family: var(--mono); }

@@ -16,7 +16,8 @@ app.use(cors({
   maxAge: 600,
 }));
 app.use(express.json({ limit: '25kb' }));
-app.use('/api/v1', rateLimit({
+// One shared limit for both /api/v1/... and the /api/cases/... paths.
+app.use('/api', rateLimit({
   windowMs: 60 * 1000,
   limit: 60,
   standardHeaders: 'draft-7',
@@ -24,6 +25,8 @@ app.use('/api/v1', rateLimit({
   message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests. Please wait a moment and try again.' } },
 }));
 app.use('/api/v1', apiRoutes);
+// Same routes without the version, so /api/cases/... works as written in SPEC.md.
+app.use('/api', apiRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

@@ -39,11 +39,13 @@ export default function Result() {
 
   const { result, solution, mystery } = payload;
   const correct = result.isCorrect;
+  // Older saved results may not have a breakdown; fall back to what we know.
+  const breakdown = result.scoreBreakdown || { maxScore: Math.max(100, result.finalScore), correctAccusation: result.finalScore, cluesDiscovered: 0, clueBonus: 0, hintPenalty: 0 };
   return <main className="result-page content-width">
     <div className="result-back"><Link to="/investigations"><ArrowLeft size={14} /> My investigations</Link><span>CASE CLOSED <i>·</i> {new Date(result.completedAt).toLocaleDateString()}</span></div>
     <section className={`result-hero ${correct ? 'solved' : 'unsolved'}`}>
       <div className="result-hero-copy"><Eyebrow icon={correct ? ShieldCheck : Fingerprint}>Final case report <span className={`difficulty-tag tag-${mystery.difficulty}`}>{mystery.difficulty}</span></Eyebrow><div className="result-verdict"><span className="verdict-icon">{correct ? <Check size={23} /> : <X size={23} />}</span><h1>{correct ? <>Case <em>solved.</em></> : <>Case <em>unsolved.</em></>}</h1></div><p>{correct ? 'Your read of the evidence held up. The pieces you followed led to the truth.' : 'The evidence pointed to another person. The full account is now yours to examine.'}</p><div className="result-case-name">{mystery.title} <span>·</span> {mystery.category}</div></div>
-      <div className="score-card"><span>INVESTIGATION SCORE</span><strong>{String(result.finalScore).padStart(3, '0')}</strong><small>OUT OF 100 POINTS</small><div className="score-rule"><i style={{ width: `${result.finalScore}%` }} /></div><div className="score-detail"><span>{result.hintsUsed} hints used</span><span>{correct ? `${result.hintsUsed * 10} points deducted` : 'Incorrect accusation'}</span></div></div>
+      <div className="score-card"><span>INVESTIGATION SCORE</span><strong>{String(result.finalScore).padStart(3, '0')}</strong><small>OUT OF {breakdown.maxScore} POINTS</small><div className="score-rule"><i style={{ width: `${Math.min(100, (result.finalScore / Math.max(1, breakdown.maxScore)) * 100)}%` }} /></div><dl className="score-breakdown"><div><dt>{correct ? 'Correct accusation' : 'Incorrect accusation'}</dt><dd>+{breakdown.correctAccusation}</dd></div><div><dt>{breakdown.cluesDiscovered} {breakdown.cluesDiscovered === 1 ? 'clue' : 'clues'} found by searching</dt><dd>+{breakdown.clueBonus}</dd></div><div><dt>{result.hintsUsed} {result.hintsUsed === 1 ? 'hint' : 'hints'} used</dt><dd>{breakdown.hintPenalty === 0 ? '0' : breakdown.hintPenalty}</dd></div></dl></div>
       <div className="result-hero-watermark"><Fingerprint size={165} strokeWidth={0.55} /></div>
     </section>
 

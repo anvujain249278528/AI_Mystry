@@ -6,9 +6,9 @@ import { friendlyError } from '../lib/api.js';
 import { startCase } from '../lib/startCase.js';
 
 const levels = [
-  { id: 'easy', number: '01', label: 'A first inquiry', suspects: '03 suspects', clues: '04—05 clues', description: 'A clean trail. Clear motives and contradictions that reward careful observation.', mark: 'THE OPENING CASE' },
-  { id: 'medium', number: '02', label: 'A tangled account', suspects: '04 suspects', clues: '06—08 clues', description: 'More than one story could fit. Separate what feels suspicious from what the evidence proves.', mark: 'THE INVESTIGATOR' },
-  { id: 'hard', number: '03', label: 'The finer details', suspects: '05 suspects', clues: '09—12 clues', description: 'Subtle contradictions, layered motives, and a timeline that asks you to look twice.', mark: 'THE COLD CASE' },
+  { id: 'easy', number: '01', label: 'A first inquiry', suspects: '03 suspects', clues: '05 clues · 2 hints', description: 'A clean trail. Clear motives and contradictions that reward careful observation.', mark: 'THE OPENING CASE' },
+  { id: 'medium', number: '02', label: 'A tangled account', suspects: '04 suspects', clues: '07 clues · 3 hints', description: 'More than one story could fit. Separate what feels suspicious from what the evidence proves.', mark: 'THE INVESTIGATOR' },
+  { id: 'hard', number: '03', label: 'The finer details', suspects: '05 suspects', clues: '09 clues · 3 hints', description: 'Subtle contradictions, layered motives, and a timeline that asks you to look twice.', mark: 'THE COLD CASE' },
 ];
 
 export default function Difficulty() {

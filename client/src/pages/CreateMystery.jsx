@@ -27,9 +27,9 @@ const tones = [
 ];
 
 const levels = [
-  { id: 'easy', label: 'Easy', detail: '3 suspects · 4–5 clues' },
-  { id: 'medium', label: 'Medium', detail: '4 suspects · 6–8 clues' },
-  { id: 'hard', label: 'Hard', detail: '5 suspects · 9–12 clues' },
+  { id: 'easy', label: 'Easy', detail: '3 suspects · 5 clues · 2 hints · 100 pts' },
+  { id: 'medium', label: 'Medium', detail: '4 suspects · 7 clues · 3 hints · 150 pts' },
+  { id: 'hard', label: 'Hard', detail: '5 suspects · 9 clues · 3 hints · 200 pts' },
 ];
 
 const examples = [

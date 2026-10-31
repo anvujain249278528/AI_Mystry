@@ -3,6 +3,7 @@ import { GameSession } from '../models/GameSession.js';
 import { InvestigationResult } from '../models/InvestigationResult.js';
 import { generateMystery, parseCustomIdea } from '../services/mysteryService.js';
 import { generateText } from '../services/gemini.js';
+import { calculateScore, difficultyRules, publicRules } from '../config/gameRules.js';
 import { AppError } from '../utils/errors.js';
 import { createSessionCredentials, hashToken } from '../utils/sessionTokens.js';
 
@@ -48,10 +49,21 @@ function publicMystery(mystery, discoveredClueIds = []) {
   };
 }
 
+function hiddenClueCount(mystery) {
+  return mystery.clues.filter((clue) => clue.discoveryCondition === 'hidden').length;
+}
+
+// Clues the player found by searching. Clues on the board from the start don't earn points.
+function searchedClueCount(gameSession, mystery) {
+  const hidden = new Set(mystery.clues.filter((clue) => clue.discoveryCondition === 'hidden').map((clue) => clue.id));
+  return gameSession.discoveredClueIds.filter((id) => hidden.has(id)).length;
+}
+
 function publicGame(gameSession, mystery) {
   const names = new Map(mystery.suspects.map((suspect) => [suspect.id, suspect.name]));
   return {
     sessionId: gameSession._id, status: gameSession.status,
+    rules: publicRules(mystery.difficulty, hiddenClueCount(mystery)),
     startedAt: gameSession.startedAt, completedAt: gameSession.completedAt,
     discoveredClueIds: gameSession.discoveredClueIds,
     hintsUsed: gameSession.hintsUsed.map((hint) => ({ level: hint.level, content: hint.content, usedAt: hint.usedAt })),
@@ -166,11 +178,15 @@ function safeHintText(value, culpritName) {
 export async function requestHint(req, res) {
   const game = req.gameSession;
   if (game.status !== 'active') throw new AppError(409, 'This investigation is already complete.', 'GAME_COMPLETED');
+  const mystery = await loadMystery(game, { solution: true, relevance: true });
+  const maxHints = difficultyRules[mystery.difficulty].hints;
   const level = Number(req.body?.level);
   const expectedLevel = game.hintsUsed.length + 1;
-  if (![1, 2, 3].includes(level)) throw new AppError(400, 'Choose a hint level from 1 to 3.', 'INVALID_HINT_LEVEL');
+  if (game.hintsUsed.length >= maxHints) throw new AppError(409, `All ${maxHints} hints for this case have been used.`, 'HINT_LIMIT_REACHED');
+  if (!Number.isInteger(level) || level < 1 || level > maxHints) throw new AppError(400, `Choose a hint level from 1 to ${maxHints}.`, 'INVALID_HINT_LEVEL');
   if (level !== expectedLevel) throw new AppError(409, `Request Hint ${expectedLevel} next to keep the clues in order.`, 'HINT_OUT_OF_ORDER');
-  const mystery = await loadMystery(game, { solution: true, relevance: true });
+  // The last hint is always the strongest one, so Easy (2 hints) goes nudge -> stronger lead.
+  const strength = level === maxHints ? 3 : level;
   const foundClues = mystery.clues
     .filter((clue) => game.discoveredClueIds.includes(clue.id))
     .map((clue) => ({ ...clueForPlayer(clue), relevance: clue.relevance }));
@@ -179,12 +195,12 @@ export async function requestHint(req, res) {
     1: 'Give a gentle, general nudge about the kind of reasoning to use. Do not name a suspect or point to one clue.',
     2: 'Point toward a relevant clue, contradiction, timeline detail, or relationship. Do not name a suspect.',
     3: 'Direct attention to the strongest evidence connection and explain what to compare, without naming or identifying any suspect.',
-  }[level];
+  }[strength];
   const prompt = `Write one concise, in-world detective hint (2-3 sentences) for a player. ${hintStrength}\nNever state or imply the culprit's identity. Do not use any suspect name. Ground the hint in the fixed case facts and clues below. Do not create new clues or change established facts.\n\nFixed case facts (authoritative, do not repeat protected solution details):\n${JSON.stringify({ location: mystery.location, crimeTime: mystery.crimeTime, foundClues, solution: mystery.solution })}\n\nReturn only the hint text.`;
   let content = await generateText(prompt, { temperature: 0.5 });
   if (!safeHintText(content, culprit?.name)) {
     const decisive = mystery.clues.find((clue) => mystery.solution.decisiveClueIds.includes(clue.id));
-    content = level === 1
+    content = strength === 1
       ? 'Compare what each person says with the order of events. Small timing details can matter more than a convincing story.'
       : `Take another look at “${decisive?.title || 'the evidence'}” and compare its timing with the accounts you have heard. Ask who had the opportunity it suggests.`;
   }
@@ -203,7 +219,9 @@ async function ensureResult(game, mystery) {
   if (!culprit || !selected) throw new AppError(500, 'The case result could not be assembled.', 'RESULT_INVALID');
   const completedAt = game.completedAt || new Date();
   const isCorrect = selected.id === culprit.id;
-  const finalScore = isCorrect ? Math.max(0, 100 - (game.hintsUsed.length * 10)) : 0;
+  const discoveredClueCount = searchedClueCount(game, mystery);
+  const score = calculateScore({ difficulty: mystery.difficulty, isCorrect, discoveredClueCount, hintsUsed: game.hintsUsed.length });
+  const { finalScore } = score;
   const updated = await GameSession.findOneAndUpdate(
     { _id: game._id, status: 'completed' }, { $set: { finalScore, completedAt } }, { new: true },
   );
@@ -220,15 +238,19 @@ async function ensureResult(game, mystery) {
     if (error?.code !== 11000) throw error;
     result = await InvestigationResult.findOne({ gameSessionId: game._id });
   }
-  return { result, gameSession: updated || game, culprit, selected };
+  return { result, gameSession: updated || game, culprit, selected, score, discoveredClueCount };
 }
 
-function resultPayload({ result, gameSession, culprit, selected }, mystery) {
+function resultPayload({ result, gameSession, culprit, selected, score, discoveredClueCount }, mystery) {
   const decisiveClues = mystery.clues.filter((clue) => mystery.solution.decisiveClueIds.includes(clue.id));
   return {
     success: true,
     result: {
       isCorrect: result.isCorrect, finalScore: result.finalScore, hintsUsed: result.hintsUsed,
+      scoreBreakdown: {
+        correctAccusation: score.basePoints, cluesDiscovered: discoveredClueCount, clueBonus: score.clueBonus,
+        hintPenalty: score.hintPenalty, maxScore: publicRules(mystery.difficulty, hiddenClueCount(mystery)).maxScore,
+      },
       selectedSuspect: suspectForPlayer(selected), actualCulprit: suspectForPlayer(culprit), completedAt: result.completedAt,
       investigationSummary: {
         cluesDiscovered: gameSession.discoveredClueIds.length,

@@ -27,6 +27,16 @@ router.post('/games/:sessionId/hints', requireSessionOwner, asyncRoute(requestHi
 router.post('/games/:sessionId/accusation', requireSessionOwner, asyncRoute(submitAccusation));
 router.get('/games/:sessionId/result', requireSessionOwner, asyncRoute(getResult));
 
+// Same game, with the paths suggested in the project brief (SPEC.md section D).
+// :sessionId is the game session id returned when the case is created.
+router.post('/cases', asyncRoute(generateCase));
+router.get('/cases/:sessionId', requireSessionOwner, asyncRoute(getGame));
+router.post('/cases/:sessionId/clues/:clueId/discover', requireSessionOwner, asyncRoute(discoverClue));
+router.post('/cases/:sessionId/interrogate', requireSessionOwner, asyncRoute(interrogate));
+router.post('/cases/:sessionId/hints', requireSessionOwner, asyncRoute(requestHint));
+router.post('/cases/:sessionId/accuse', requireSessionOwner, asyncRoute(submitAccusation));
+router.get('/cases/:sessionId/result', requireSessionOwner, asyncRoute(getResult));
+
 router.use((req, _res, next) => next(new AppError(404, `No API route for ${req.method} ${req.path}.`, 'NOT_FOUND')));
 
 export default router;

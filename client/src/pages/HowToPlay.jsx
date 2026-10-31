@@ -6,7 +6,7 @@ const steps = [
   { icon: BookOpen, index: 'I', title: 'Read the briefing', text: 'Get the scene, the timeline, and the people involved. The solution is already fixed, but it is yours to find.' },
   { icon: Eye, index: 'II', title: 'Examine what is there', text: 'Start with the evidence on the board. Search a location to uncover clues that were not obvious at first.' },
   { icon: MessageCircle, index: 'III', title: 'Ask the suspects', text: 'Choose a person and ask what you need to know. Compare their answers with the evidence you have found.' },
-  { icon: Lightbulb, index: 'IV', title: 'Use a hint, if needed', text: 'Hints come in three steps, from a light nudge to a closer look at the evidence. Each hint lowers a correct-case score by ten points.' },
+  { icon: Lightbulb, index: 'IV', title: 'Use a hint, if needed', text: 'Hints come in steps, from a light nudge to a closer look at the evidence: 2 on Easy, 3 on Medium and Hard. Each hint costs 10 points.' },
   { icon: Fingerprint, index: 'V', title: 'Make your accusation', text: 'Select one suspect when you are ready. Your final accusation is locked, then the full explanation is revealed.' },
 ];
 
