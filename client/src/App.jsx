@@ -11,7 +11,12 @@ import About from './pages/About.jsx';
 import Investigations from './pages/Investigations.jsx';
 
 function NotFound() {
-  return <main className="content-width not-found"><span>404 <i>·</i> COLD TRAIL</span><h1>This page left<br /><em>no evidence.</em></h1><p>The address may have changed, or the case file has been closed.</p><a className="button button-gold" href="/">Return to the room</a></main>;
+  return <main className="page-width min-h-[70vh] pt-[90px]">
+    <span className="font-mono text-[9px] tracking-[.14em] text-gold">404 <i className="not-italic text-[#777]">·</i> COLD TRAIL</span>
+    <h1 className="mt-5 mb-[15px] font-serif text-[62px] leading-[1.05] font-medium max-[620px]:text-[46px] [&_em]:font-medium [&_em]:text-gold">This page left<br /><em>no evidence.</em></h1>
+    <p className="mb-[25px] text-xs text-[#a1a1a9]">The address may have changed, or the case file has been closed.</p>
+    <a className="button button-gold" href="/">Return to the room</a>
+  </main>;
 }
 
 export default function App() {

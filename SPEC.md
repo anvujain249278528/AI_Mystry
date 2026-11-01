@@ -55,7 +55,7 @@ Most mystery games have a fixed storyline, so a case can be played only once. AI
 |---|---|---|---|
 | Frontend | React + Vite | React 18 + Vite 6 | |
 | Routing | react-router-dom | react-router-dom 7 | |
-| Styling | Tailwind CSS | Plain CSS with CSS variables (`client/src/styles.css`) | The custom "detective room" design was built with hand-written CSS before Tailwind was required. Colors and fonts are defined once as variables, so moving to Tailwind later is a styling-only change. |
+| Styling | Tailwind CSS | Tailwind CSS v4 (`@tailwindcss/vite`) | Theme colors and fonts are Tailwind theme tokens in `client/src/styles.css` (e.g. `bg-bg`, `text-gold`, `font-serif`). Header, footer, Home, Difficulty, Create Mystery, Briefing, How to play, About, My investigations, and 404 are styled with Tailwind utilities. The Investigation room, Result page, and animated home-page scene still use the older hand-written styles in `legacy.css`, loaded in a lower cascade layer so Tailwind classes always win. |
 | HTTP client | axios | Built-in `fetch` wrapper (`client/src/lib/api.js`) | Same job, no extra dependency. |
 | Backend | Node.js + Express | Node 20+ + Express 4 | |
 | Database | MongoDB + Mongoose | MongoDB Atlas + Mongoose 8 | |
@@ -120,7 +120,7 @@ Step by step:
 
 ## C. UI and page specifications
 
-Design tokens (defined in `:root` in `styles.css`): background `#101116`, surface `#191b23`, card `#222530`, gold accent `#c9a45c`, red accent `#a83232`, text `#f4f1ea`, muted text `#a5a5ae`. Fonts: Playfair Display (headings), DM Sans (body), DM Mono (labels).
+Design tokens (Tailwind `@theme` in `client/src/styles.css`; also mirrored as CSS variables in `legacy.css`): background `#101116`, surface `#191b23`, card `#222530`, gold accent `#c9a45c`, red accent `#a83232`, text `#f4f1ea`, muted text `#a5a5ae`. Fonts: Playfair Display (headings), DM Sans (body), DM Mono (labels).
 
 ### C.1 Pages
 
@@ -453,3 +453,4 @@ Never commit `.env`. Only `VITE_API_BASE_URL` is used by the frontend; everythin
 5. Treat all player text as untrusted in prompts.
 6. Keep secrets in `.env`; never commit them.
 7. Build and test in small steps against section F.
+8. Style new UI with Tailwind utilities and the theme tokens. Don't add new rules to `legacy.css`; when converting a legacy page, delete the rules it no longer uses.

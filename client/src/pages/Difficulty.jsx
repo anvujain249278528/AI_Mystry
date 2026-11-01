@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Fingerprint, LoaderCircle, PenLine, Sparkles } from 'lucide-react';
-import { Eyebrow } from '../components/SiteChrome.jsx';
+import { ArrowRight, Fingerprint, LoaderCircle, PenLine, Sparkles } from 'lucide-react';
+import { BackRow, InlineError, PageHeading, Radio } from '../components/ui.jsx';
 import { friendlyError } from '../lib/api.js';
 import { startCase } from '../lib/startCase.js';
 
@@ -31,18 +31,35 @@ export default function Difficulty() {
     }
   }
 
-  return <main className="difficulty-page content-width">
-    <div className="back-row"><button className="back-button" onClick={() => navigate('/')}><ArrowLeft size={14} /> Back to the room</button><span>CASE SETUP <i>—</i> 01 / 02</span></div>
-    <header className="difficulty-heading"><Eyebrow icon={Sparkles}>Set your own pace</Eyebrow><h1>Choose your<br /><em>difficulty.</em></h1><p>Every case follows the same rule: the truth is there from the start. Choose how much you want to untangle.</p></header>
-    <div className="difficulty-grid">
-      {levels.map((level) => <button key={level.id} className={`difficulty-card ${selected === level.id ? 'selected' : ''}`} onClick={() => setSelected(level.id)} aria-pressed={selected === level.id}>
-        <div className="difficulty-card-top"><span>{level.number}</span><span className="difficulty-radio">{selected === level.id && <i />}</span></div>
-        <div className="difficulty-card-middle"><span className="difficulty-mark">{level.mark}</span><h2>{level.label}</h2><p>{level.description}</p></div>
-        <div className="difficulty-card-bottom"><span>{level.suspects}</span><span>{level.clues}</span></div>
-      </button>)}
+  return <main className="page-width min-h-[calc(100vh-143px)] pt-10 pb-[58px] max-[620px]:pt-6 max-[620px]:pb-10">
+    <BackRow onBack={() => navigate('/')}>CASE SETUP <i>—</i> 01 / 02</BackRow>
+    <PageHeading icon={Sparkles} eyebrow="Set your own pace" title={<>Choose your<br /><em>difficulty.</em></>}>Every case follows the same rule: the truth is there from the start. Choose how much you want to untangle.</PageHeading>
+    <div className="grid grid-cols-3 gap-[13px] max-[620px]:grid-cols-1 max-[620px]:gap-2">
+      {levels.map((level) => {
+        const isSelected = selected === level.id;
+        return <button key={level.id} onClick={() => setSelected(level.id)} aria-pressed={isSelected}
+          className={`relative flex min-h-[249px] cursor-pointer flex-col justify-between border px-[21px] pt-5 pb-[17px] text-left transition hover:-translate-y-0.5 max-[620px]:min-h-[174px] max-[620px]:p-[15px] ${isSelected
+            ? 'border-gold bg-[#1c1c20] bg-[linear-gradient(140deg,rgba(92,73,40,.36),#1c1c20_78%)] shadow-[0_0_0_1px_rgba(201,164,92,.11)]'
+            : 'border-paper/10 bg-[#191b22] bg-[linear-gradient(140deg,#22242d,#191b22_75%)] hover:border-gold/55'}`}>
+          <div className="flex items-center justify-between"><span className="font-mono text-[9px] text-[#777781]">{level.number}</span><Radio checked={isSelected} /></div>
+          <div>
+            <span className="font-mono text-[8px] tracking-[.16em] text-gold">{level.mark}</span>
+            <h2 className="mt-[11px] mb-2 font-serif text-[23px] font-medium">{level.label}</h2>
+            <p className="m-0 max-w-[250px] text-[11px] leading-[1.72] text-[#a3a3aa] max-[620px]:max-w-[430px]">{level.description}</p>
+          </div>
+          <div className="flex items-center justify-between border-t border-line pt-[13px] font-mono text-[8px] tracking-[.1em] text-[#c2c0b9] uppercase"><span>{level.suspects}</span><span>{level.clues}</span></div>
+        </button>;
+      })}
     </div>
-    <div className="difficulty-footer"><p><Fingerprint size={15} /> Your case is generated when you continue. The solution is fixed before play begins.</p><button className="button button-gold generate-button" onClick={begin} disabled={busy}>{busy ? <><LoaderCircle className="spin" size={16} /> Preparing case</> : <>Generate mystery <ArrowRight size={16} /></>}</button></div>
-    {error && <div className="inline-error"><span>!</span><p>{error}</p><button onClick={begin}>Retry</button></div>}
-    <Link className="create-own-banner" to="/create"><PenLine size={18} strokeWidth={1.4} /><div><b>Have a story in mind?</b><span>Write your own case idea and the AI will build the suspects, clues, and solution around it.</span></div><ArrowRight size={16} /></Link>
+    <div className="flex items-center justify-between pt-[23px] max-[620px]:flex-col max-[620px]:items-stretch max-[620px]:gap-2.5 max-[620px]:pt-[15px]">
+      <p className="flex max-w-[500px] items-center gap-[9px] text-[10px] leading-[1.6] text-[#93939b] max-[620px]:m-0 max-[620px]:text-[9px]"><Fingerprint size={15} className="shrink-0 text-gold" /> Your case is generated when you continue. The solution is fixed before play begins.</p>
+      <button className="button button-gold min-w-[196px] max-[620px]:w-full" onClick={begin} disabled={busy}>{busy ? <><LoaderCircle className="spin" size={16} /> Preparing case</> : <>Generate mystery <ArrowRight size={16} /></>}</button>
+    </div>
+    {error && <InlineError message={error} onRetry={begin} />}
+    <Link to="/create" className="mt-7 flex items-center gap-[15px] border border-dashed border-gold/40 bg-gold/4 px-[19px] py-[17px] text-muted transition-colors hover:border-gold hover:bg-gold/8">
+      <PenLine size={18} strokeWidth={1.4} className="shrink-0 text-gold" />
+      <div className="grid flex-1 gap-1"><b className="font-serif text-[17px] font-medium text-paper">Have a story in mind?</b><span className="text-[11px] leading-[1.6]">Write your own case idea and the AI will build the suspects, clues, and solution around it.</span></div>
+      <ArrowRight size={16} />
+    </Link>
   </main>;
 }
